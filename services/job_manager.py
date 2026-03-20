@@ -15,6 +15,15 @@ from utils.url_utils import normalize_url
 
 
 STALE_JOB_STATUSES = {"queued", "running"}
+JOB_DEFAULTS = {
+    "processed_count": 0,
+    "discovered_count": 0,
+    "queued_count": 0,
+    "throttled": False,
+    "error_message": "",
+    "throttle_count": 0,
+    "last_throttle_at": "",
+}
 
 
 class JobManager:
@@ -41,7 +50,7 @@ class JobManager:
                 record["updated_at"] = _timestamp()
                 write_json(crawler_data_path(crawler_id), record)
 
-            self.jobs_by_id[crawler_id] = dict(record)
+            self.jobs_by_id[crawler_id] = self._normalize_job_record(record)
 
     def register_job(self, job_data: dict, thread: threading.Thread | None = None) -> None:
         crawler_id = str(job_data.get("crawler_id", ""))
@@ -49,7 +58,7 @@ class JobManager:
             raise ValueError("crawler_id is required")
 
         with self.job_state_lock:
-            self.jobs_by_id[crawler_id] = dict(job_data)
+            self.jobs_by_id[crawler_id] = self._normalize_job_record(job_data)
             write_json(crawler_data_path(crawler_id), self.jobs_by_id[crawler_id])
             if thread is not None:
                 self.threads_by_id[crawler_id] = thread
@@ -58,9 +67,9 @@ class JobManager:
         with self.job_state_lock:
             current = dict(self.jobs_by_id.get(crawler_id, {}))
             current.update(updates)
-            self.jobs_by_id[crawler_id] = current
-            write_json(crawler_data_path(crawler_id), current)
-            return dict(current)
+            self.jobs_by_id[crawler_id] = self._normalize_job_record(current)
+            write_json(crawler_data_path(crawler_id), self.jobs_by_id[crawler_id])
+            return dict(self.jobs_by_id[crawler_id])
 
     def get_job(self, crawler_id: str) -> dict | None:
         with self.job_state_lock:
@@ -83,6 +92,11 @@ class JobManager:
             self.visited_urls.add(normalized_url)
             append_visited_url(normalized_url)
             return True
+
+    def _normalize_job_record(self, record: dict) -> dict:
+        normalized = dict(JOB_DEFAULTS)
+        normalized.update(record)
+        return normalized
 
 
 def _timestamp() -> str:

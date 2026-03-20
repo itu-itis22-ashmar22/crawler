@@ -4,59 +4,110 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Search</title>
-    <style>
-        body { font-family: sans-serif; margin: 2rem; line-height: 1.4; }
-        form { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
-        input { flex: 1; padding: 0.5rem; }
-        button { padding: 0.5rem 1rem; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; vertical-align: top; }
-        nav { margin-bottom: 1rem; }
-        small { color: #555; }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
 </head>
-<body>
-    <nav>
-        <a href="/crawler">Crawler</a> |
-        <a href="/search">Search</a>
-    </nav>
+<body class="search-page">
+    <div class="shell search-shell">
+        <header class="topbar">
+            <a class="brand" href="/crawler">
+                <span class="brand-mark">C</span>
+                <span class="brand-copy">Crawler Engine<span>live indexing dashboard</span></span>
+            </a>
+            <nav class="nav-links">
+                <a href="/search" class="{{ 'active' if active_page == 'search' else '' }}">Search</a>
+                <a href="/crawler" class="{{ 'active' if active_page == 'crawler' else '' }}">Create Crawler</a>
+            </nav>
+        </header>
 
-    <h1>Search</h1>
+        <section class="search-space-hero">
+            <div class="search-space-grid">
+                <div class="search-copy">
+                    <p class="search-eyebrow">Orbital Lookup Mode</p>
+                    <h1>Search across a live index from deep space.</h1>
+                    <p>
+                        A fresher search experience with a cinematic space mood, while keeping the engine honest:
+                        exact-token results, live indexing, and direct visibility into the current dataset.
+                    </p>
+                </div>
 
-    <form method="get" action="/search">
-        <input type="search" name="query" value="{{ query }}" placeholder="Enter a query">
-        <button type="submit">Search</button>
-    </form>
+                <div class="space-scene" aria-hidden="true">
+                    <div class="planet-moon"></div>
+                    <div class="planet-earth"></div>
+                    <div class="terrain"></div>
+                    <div class="astronaut-card">
+                        <div class="astronaut-icon"></div>
+                        <div>
+                            <strong>Search while crawlers run</strong>
+                            <span>Live results stay available without waiting for every job to finish.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-    {% if query %}
-    <p>Total matching result count: {{ total_count }}</p>
-    {% endif %}
+        <section class="search-control-band">
+            <form method="get" action="/search" class="search-form">
+                <div class="search-form-row">
+                    <input class="search-input" type="search" name="query" value="{{ query }}" placeholder="Search the indexed web...">
+                    <button class="button button-primary" type="submit" name="mode" value="search">Web Search</button>
+                    <button class="button button-secondary" type="submit" name="mode" value="lucky">I'm Feeling Lucky</button>
+                </div>
+            </form>
+        </section>
 
-    {% if results %}
-    <table>
-        <thead>
-            <tr>
-                <th>Relevant URL</th>
-                <th>Origin URL</th>
-                <th>Depth</th>
-            </tr>
-        </thead>
-        <tbody>
+        <section class="metric-grid">
+            <article class="metric-card">
+                <label>URLs Visited</label>
+                <strong>{{ dashboard_metrics.urls_visited }}</strong>
+                <span>Global visited entries</span>
+            </article>
+            <article class="metric-card">
+                <label>Words in DB</label>
+                <strong>{{ dashboard_metrics.word_records }}</strong>
+                <span>Index records available now</span>
+            </article>
+            <article class="metric-card">
+                <label>Active Crawlers</label>
+                <strong>{{ dashboard_metrics.active_crawlers }}</strong>
+                <span>Search stays available while they run</span>
+            </article>
+            <article class="metric-card">
+                <label>Total Created</label>
+                <strong>{{ dashboard_metrics.total_created }}</strong>
+                <span>Persisted crawler jobs</span>
+            </article>
+        </section>
+
+        {% if query %}
+        <p class="search-summary">About {{ total_count }} result{{ "" if total_count == 1 else "s" }} for <strong>{{ query }}</strong></p>
+        {% endif %}
+
+        {% if results %}
+        <section class="result-stack">
             {% for result in results %}
-            <tr>
-                <td>
-                    <a href="{{ result.relevant_url }}" target="_blank" rel="noreferrer">{{ result.relevant_url }}</a>
-                    <br>
-                    <small>frequency={{ result.total_frequency }}</small>
-                </td>
-                <td><a href="{{ result.origin_url }}" target="_blank" rel="noreferrer">{{ result.origin_url }}</a></td>
-                <td>{{ result.depth }}</td>
-            </tr>
+            <article class="result-card">
+                <div class="result-head">
+                    <a class="result-link" href="{{ result.relevant_url }}" target="_blank" rel="noreferrer">{{ result.relevant_url }}</a>
+                    <span class="status-pill status-completed">depth {{ result.depth }}</span>
+                </div>
+                <div class="result-meta">
+                    <div>
+                        <strong>Origin URL</strong>
+                        <a href="{{ result.origin_url }}" target="_blank" rel="noreferrer">{{ result.origin_url }}</a>
+                    </div>
+                    <div>
+                        <strong>Total Frequency</strong>
+                        <span>{{ result.total_frequency }}</span>
+                    </div>
+                </div>
+            </article>
             {% endfor %}
-        </tbody>
-    </table>
-    {% elif query %}
-    <p>No results found for this query.</p>
-    {% endif %}
+        </section>
+        {% elif query %}
+        <div class="empty-state">No results found for this query yet. If crawlers are still running, try again in a few seconds.</div>
+        {% endif %}
+
+        <p class="footer-note">Exact results, live index, and a cleaner search atmosphere without losing the real engine signals.</p>
+    </div>
 </body>
 </html>

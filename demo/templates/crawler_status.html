@@ -4,50 +4,148 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Crawler Status</title>
-    <style>
-        body { font-family: sans-serif; margin: 2rem; line-height: 1.4; }
-        dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.5rem 1rem; margin-bottom: 2rem; }
-        pre { background: #f5f5f5; padding: 1rem; white-space: pre-wrap; }
-        nav { margin-bottom: 1rem; }
-        .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        @media (max-width: 800px) {
-            .columns { grid-template-columns: 1fr; }
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
 </head>
-<body>
-    <nav>
-        <a href="/crawler">Crawler</a> |
-        <a href="/search">Search</a>
-    </nav>
+<body class="space-app">
+    <div class="shell">
+        <header class="topbar">
+            <a class="brand" href="/crawler">
+                <span class="brand-mark">C</span>
+                <span class="brand-copy">Crawler Engine<span>live indexing dashboard</span></span>
+            </a>
+            <nav class="nav-links">
+                <a href="/search" class="{{ 'active' if active_page == 'search' else '' }}">Search</a>
+                <a href="/crawler" class="{{ 'active' if active_page == 'crawler' else '' }}">Create Crawler</a>
+                <a href="/crawler/{{ crawler.crawler_id }}" class="{{ 'active' if active_page == 'status' else '' }}">Crawler Status</a>
+            </nav>
+        </header>
 
-    <h1>Crawler Status</h1>
-
-    <dl>
-        <dt>Crawler ID</dt><dd id="crawler_id">{{ crawler.crawler_id }}</dd>
-        <dt>Origin URL</dt><dd id="origin_url"><a href="{{ crawler.origin_url }}" target="_blank" rel="noreferrer">{{ crawler.origin_url }}</a></dd>
-        <dt>Status</dt><dd id="status">{{ crawler.status }}</dd>
-        <dt>Max Depth</dt><dd id="max_depth">{{ crawler.max_depth }}</dd>
-        <dt>Processed Count</dt><dd id="processed_count">{{ crawler.processed_count }}</dd>
-        <dt>Discovered Count</dt><dd id="discovered_count">{{ crawler.discovered_count }}</dd>
-        <dt>Queued Count</dt><dd id="queued_count">{{ crawler.queued_count }}</dd>
-        <dt>Throttled</dt><dd id="throttled">{{ "true" if crawler.throttled else "false" }}</dd>
-        <dt>Updated At</dt><dd id="updated_at">{{ crawler.updated_at }}</dd>
-        <dt>Error Message</dt><dd id="error_message">{{ crawler.error_message or "-" }}</dd>
-    </dl>
-
-    <div class="columns">
-        <section>
-            <h2>Queue Preview</h2>
-            <pre id="queue_preview">{% for item in crawler.queue_preview %}{{ item }}
-{% else %}(empty)
-{% endfor %}</pre>
+        <section class="hero">
+            <div class="hero-grid">
+                <div>
+                    <p class="eyebrow">Status telemetry</p>
+                    <h1>See queue pressure, crawl depth, and throttle history in one place.</h1>
+                    <p>
+                        This status page keeps both the current throttle state and the historical throttle trail visible,
+                        so completed crawls still show whether load control actually kicked in earlier.
+                    </p>
+                    <div class="pill-row">
+                        <span class="pill">Crawler ID <span class="mono">{{ crawler.crawler_id }}</span></span>
+                        <span class="pill">Origin {{ crawler.origin_url }}</span>
+                    </div>
+                </div>
+                <aside class="hero-aside">
+                    <h2>Polling every 3s</h2>
+                    <p>State, queue preview, and logs refresh from the status API without reloading the full page.</p>
+                    <ul>
+                        <li>Current queue depth</li>
+                        <li>Current throttled state</li>
+                        <li>Throttle count and last event</li>
+                    </ul>
+                </aside>
+            </div>
         </section>
-        <section>
-            <h2>Log Tail</h2>
-            <pre id="log_tail">{% for item in crawler.log_tail %}{{ item }}
-{% else %}(no logs yet)
-{% endfor %}</pre>
+
+        {% if created %}
+        <div class="alert alert-success">
+            Crawler created successfully. Status is now live and will refresh automatically.
+        </div>
+        {% endif %}
+
+        <section class="data-grid">
+            <article class="data-card">
+                <label>Status</label>
+                <strong id="status">{{ crawler.status }}</strong>
+            </article>
+            <article class="data-card">
+                <label>Processed</label>
+                <strong id="processed_count">{{ crawler.processed_count }}</strong>
+            </article>
+            <article class="data-card">
+                <label>Discovered</label>
+                <strong id="discovered_count">{{ crawler.discovered_count }}</strong>
+            </article>
+            <article class="data-card">
+                <label>Queued</label>
+                <strong id="queued_count">{{ crawler.queued_count }}</strong>
+            </article>
+            <article class="data-card">
+                <label>Current Throttled</label>
+                <strong id="throttled">{{ "true" if crawler.throttled else "false" }}</strong>
+            </article>
+            <article class="data-card">
+                <label>Throttle Count</label>
+                <strong id="throttle_count">{{ crawler.throttle_count }}</strong>
+            </article>
+            <article class="data-card">
+                <label>Last Throttle Event</label>
+                <strong id="last_throttle_at">{{ crawler.last_throttle_at or "-" }}</strong>
+            </article>
+            <article class="data-card">
+                <label>Updated At</label>
+                <strong id="updated_at">{{ crawler.updated_at }}</strong>
+            </article>
+        </section>
+
+        <div class="status-layout">
+            <section class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Crawler Details</h2>
+                        <p class="panel-subtitle">Live metadata and current execution settings.</p>
+                    </div>
+                </div>
+                <div class="job-meta">
+                    <div>
+                        <strong>Crawler ID</strong>
+                        <span id="crawler_id" class="mono">{{ crawler.crawler_id }}</span>
+                    </div>
+                    <div>
+                        <strong>Origin URL</strong>
+                        <span id="origin_url"><a href="{{ crawler.origin_url }}" target="_blank" rel="noreferrer">{{ crawler.origin_url }}</a></span>
+                    </div>
+                    <div>
+                        <strong>Max Depth</strong>
+                        <span id="max_depth">{{ crawler.max_depth }}</span>
+                    </div>
+                    <div>
+                        <strong>Error Message</strong>
+                        <span id="error_message">{{ crawler.error_message or "-" }}</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Queue Preview</h2>
+                        <p class="panel-subtitle">First queued URLs currently waiting to be processed.</p>
+                    </div>
+                </div>
+                <div id="queue_preview" class="queue-list">
+                    {% for item in crawler.queue_preview %}
+                    <div class="queue-item mono">{{ item }}</div>
+                    {% else %}
+                    <div class="empty-state">(empty)</div>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+
+        <section class="panel" style="margin-top:24px;">
+            <div class="panel-header">
+                <div>
+                    <h2>Log Tail</h2>
+                    <p class="panel-subtitle">Operational events from the running crawler thread.</p>
+                </div>
+            </div>
+            <div id="log_tail" class="timeline">
+                {% for item in crawler.log_tail %}
+                <div class="timeline-item">{{ item }}</div>
+                {% else %}
+                <div class="empty-state">(no logs yet)</div>
+                {% endfor %}
+            </div>
         </section>
     </div>
 
@@ -61,16 +159,28 @@
             }
         }
 
-        function setBlockText(id, lines, emptyText) {
+        function setQueueLines(id, lines, emptyText) {
             const element = document.getElementById(id);
             if (!element) {
                 return;
             }
             if (!Array.isArray(lines) || lines.length === 0) {
-                element.textContent = emptyText;
+                element.innerHTML = `<div class="empty-state">${emptyText}</div>`;
                 return;
             }
-            element.textContent = lines.join("\n");
+            element.innerHTML = lines.map((line) => `<div class="queue-item mono">${line}</div>`).join("");
+        }
+
+        function setTimelineLines(id, lines, emptyText) {
+            const element = document.getElementById(id);
+            if (!element) {
+                return;
+            }
+            if (!Array.isArray(lines) || lines.length === 0) {
+                element.innerHTML = `<div class="empty-state">${emptyText}</div>`;
+                return;
+            }
+            element.innerHTML = lines.map((line) => `<div class="timeline-item">${line}</div>`).join("");
         }
 
         async function refreshStatus() {
@@ -87,10 +197,12 @@
             setText("discovered_count", data.discovered_count ?? 0);
             setText("queued_count", data.queued_count ?? 0);
             setText("throttled", String(Boolean(data.throttled)));
+            setText("throttle_count", data.throttle_count ?? 0);
+            setText("last_throttle_at", data.last_throttle_at || "-");
             setText("updated_at", data.updated_at ?? "");
             setText("error_message", data.error_message || "-");
-            setBlockText("queue_preview", data.queue_preview, "(empty)");
-            setBlockText("log_tail", data.log_tail, "(no logs yet)");
+            setQueueLines("queue_preview", data.queue_preview, "(empty)");
+            setTimelineLines("log_tail", data.log_tail, "(no logs yet)");
         }
 
         setInterval(refreshStatus, 3000);

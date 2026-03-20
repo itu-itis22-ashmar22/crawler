@@ -78,6 +78,8 @@ class CrawlerService:
             "queued_count": 1,
             "throttled": False,
             "error_message": "",
+            "throttle_count": 0,
+            "last_throttle_at": "",
         }
 
         with self.job_manager.queue_lock:
@@ -213,6 +215,9 @@ class CrawlerService:
                         next_depth=depth + 1,
                         queue_capacity=job_data["queue_capacity"],
                     )
+                if throttled:
+                    job_data["throttle_count"] += 1
+                    job_data["last_throttle_at"] = _timestamp()
 
                 job_data["processed_count"] += 1
                 job_data["queued_count"] = len(runtime_queue)

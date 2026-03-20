@@ -141,3 +141,12 @@ def load_crawler_records() -> list[dict]:
         return str(record.get("created_at", ""))
 
     return sorted(records, key=sort_key, reverse=True)
+
+
+def count_word_records() -> int:
+    ensure_storage_layout()
+    total = 0
+    for bucket_file in WORDS_ROOT.glob("*.data"):
+        with bucket_file.open("r", encoding="utf-8") as handle:
+            total += sum(1 for line in handle if line.strip())
+    return total

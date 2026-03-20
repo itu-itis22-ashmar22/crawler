@@ -3,85 +3,181 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Crawler</title>
-    <style>
-        body { font-family: sans-serif; margin: 2rem; line-height: 1.4; }
-        form { display: grid; gap: 0.75rem; max-width: 32rem; margin-bottom: 2rem; }
-        label { display: grid; gap: 0.25rem; }
-        input { padding: 0.5rem; }
-        button { width: fit-content; padding: 0.5rem 1rem; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; vertical-align: top; }
-        .error { color: #a40000; margin-bottom: 1rem; }
-        nav { margin-bottom: 1rem; }
-    </style>
+    <title>Create Crawler</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
 </head>
-<body>
-    <nav>
-        <a href="/crawler">Crawler</a> |
-        <a href="/search">Search</a>
-    </nav>
+<body class="space-app">
+    <div class="shell">
+        <header class="topbar">
+            <a class="brand" href="/crawler">
+                <span class="brand-mark">C</span>
+                <span class="brand-copy">Crawler Engine<span>live indexing dashboard</span></span>
+            </a>
+            <nav class="nav-links">
+                <a href="/search" class="{{ 'active' if active_page == 'search' else '' }}">Search</a>
+                <a href="/crawler" class="{{ 'active' if active_page == 'crawler' else '' }}">Create Crawler</a>
+            </nav>
+        </header>
 
-    <h1>Crawler Jobs</h1>
+        <section class="hero">
+            <div class="hero-grid">
+                <div>
+                    <p class="eyebrow">Launch and monitor</p>
+                    <h1>Build a live index while the crawler is still moving.</h1>
+                    <p>
+                        Start a new crawl, control depth and queue pressure, and inspect state in real time.
+                        The frontend keeps the engine readable instead of hiding the operational details.
+                    </p>
+                    <div class="pill-row">
+                        <span class="pill">Visited-set dedupe</span>
+                        <span class="pill">Queue back pressure</span>
+                        <span class="pill">Search during indexing</span>
+                    </div>
+                </div>
+                <aside class="hero-aside">
+                    <h2>Runtime focus</h2>
+                    <p>This view stays operational first: queue depth, throttling, logs, and recent jobs stay visible while you start new crawlers.</p>
+                    <ul>
+                        <li>One crawler thread per job</li>
+                        <li>Filesystem-backed storage layer</li>
+                        <li>Frequency + depth ranking</li>
+                    </ul>
+                </aside>
+            </div>
+        </section>
 
-    {% if error_message %}
-    <p class="error">{{ error_message }}</p>
-    {% endif %}
+        <section class="metric-grid">
+            <article class="metric-card">
+                <label>URLs Visited</label>
+                <strong>{{ dashboard_metrics.urls_visited }}</strong>
+                <span>Global visited set entries</span>
+            </article>
+            <article class="metric-card">
+                <label>Words in DB</label>
+                <strong>{{ dashboard_metrics.word_records }}</strong>
+                <span>Filesystem index records</span>
+            </article>
+            <article class="metric-card">
+                <label>Active Crawlers</label>
+                <strong>{{ dashboard_metrics.active_crawlers }}</strong>
+                <span>Queued or running jobs</span>
+            </article>
+            <article class="metric-card">
+                <label>Total Created</label>
+                <strong>{{ dashboard_metrics.total_created }}</strong>
+                <span>Jobs persisted on disk</span>
+            </article>
+        </section>
 
-    <form method="post" action="/crawler">
-        <label>
-            Origin URL
-            <input type="url" name="origin_url" required value="{{ form_data.origin_url }}">
-        </label>
-        <label>
-            Max Depth
-            <input type="number" name="max_depth" min="0" max="5" required value="{{ form_data.max_depth }}">
-        </label>
-        <label>
-            Hit Rate (seconds)
-            <input type="number" name="hit_rate_seconds" min="0" max="10" step="0.1" required value="{{ form_data.hit_rate_seconds }}">
-        </label>
-        <label>
-            Max URLs
-            <input type="number" name="max_urls_to_visit" min="1" max="500" required value="{{ form_data.max_urls_to_visit }}">
-        </label>
-        <label>
-            Queue Capacity
-            <input type="number" name="queue_capacity" min="1" max="2000" required value="{{ form_data.queue_capacity }}">
-        </label>
-        <button type="submit">Start Crawler</button>
-    </form>
+        <div class="content-grid">
+            <section class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Create New Crawler</h2>
+                        <p class="panel-subtitle">Set crawl reach, pacing, and queue pressure up front.</p>
+                    </div>
+                </div>
 
-    <h2>Previous Jobs</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Crawler ID</th>
-                <th>Origin URL</th>
-                <th>Status</th>
-                <th>Processed Count</th>
-                <th>Queued Count</th>
-                <th>Throttled</th>
-                <th>Status Page</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for job in jobs %}
-            <tr>
-                <td>{{ job.crawler_id }}</td>
-                <td><a href="{{ job.origin_url }}" target="_blank" rel="noreferrer">{{ job.origin_url }}</a></td>
-                <td>{{ job.status }}</td>
-                <td>{{ job.processed_count }}</td>
-                <td>{{ job.queued_count }}</td>
-                <td>{{ "yes" if job.throttled else "no" }}</td>
-                <td><a href="/crawler/{{ job.crawler_id }}">View</a></td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="7">No crawler jobs yet.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                {% if error_message %}
+                <div class="alert alert-error">{{ error_message }}</div>
+                {% endif %}
+
+                <form method="post" action="/crawler" class="hero-form">
+                    <div class="form-grid">
+                        <label class="field field-wide">
+                            <span class="field-label">Origin URL</span>
+                            <input type="url" name="origin_url" required value="{{ form_data.origin_url }}" placeholder="https://en.wikipedia.org/wiki/Main_Page">
+                        </label>
+                        <label class="field">
+                            <span class="field-label">Max Depth</span>
+                            <input type="number" name="max_depth" min="0" max="5" required value="{{ form_data.max_depth }}">
+                        </label>
+                        <label class="field">
+                            <span class="field-label">Hit Rate (seconds)</span>
+                            <input type="number" name="hit_rate_seconds" min="0" max="10" step="0.1" required value="{{ form_data.hit_rate_seconds }}">
+                        </label>
+                        <label class="field">
+                            <span class="field-label">Queue Capacity</span>
+                            <input type="number" name="queue_capacity" min="1" max="2000" required value="{{ form_data.queue_capacity }}">
+                        </label>
+                        <label class="field">
+                            <span class="field-label">Max URLs to Visit</span>
+                            <input type="number" name="max_urls_to_visit" min="1" max="500" required value="{{ form_data.max_urls_to_visit }}">
+                        </label>
+                    </div>
+
+                    <div class="hint-grid">
+                        <div class="hint-card">
+                            <strong>Fast smoke test</strong>
+                            <span>`example.com`, depth `0`, max URLs `1`, queue `10`.</span>
+                        </div>
+                        <div class="hint-card">
+                            <strong>Throttle demo</strong>
+                            <span>Set queue capacity to `1` on a dense page to make throttling visible.</span>
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                        <button class="button button-primary" type="submit">Start Crawler</button>
+                        <a class="button button-ghost" href="/search">Open Search</a>
+                    </div>
+                </form>
+            </section>
+
+            <section class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Recent Crawlers</h2>
+                        <p class="panel-subtitle">Newest jobs first, with queue and throttle visibility kept in view.</p>
+                    </div>
+                </div>
+
+                <div class="job-stack">
+                    {% for job in jobs %}
+                    <article class="job-card">
+                        <div class="job-head">
+                            <div>
+                                <a href="/crawler/{{ job.crawler_id }}">{{ job.crawler_id }}</a>
+                                <p class="panel-subtitle">Created {{ job.created_at }}</p>
+                            </div>
+                            <span class="status-pill status-{{ job.status }}">{{ job.status }}</span>
+                        </div>
+                        <div class="job-meta">
+                            <div>
+                                <strong>Origin</strong>
+                                <a href="{{ job.origin_url }}" target="_blank" rel="noreferrer">{{ job.origin_url }}</a>
+                            </div>
+                            <div>
+                                <strong>Last Updated</strong>
+                                <span>{{ job.updated_at }}</span>
+                            </div>
+                            <div>
+                                <strong>Processed</strong>
+                                <span>{{ job.processed_count }} pages</span>
+                            </div>
+                            <div>
+                                <strong>Queued</strong>
+                                <span>{{ job.queued_count }} waiting</span>
+                            </div>
+                            <div>
+                                <strong>Throttle Count</strong>
+                                <span>{{ job.throttle_count }}</span>
+                            </div>
+                            <div>
+                                <strong>Current Throttled</strong>
+                                <span>{{ "yes" if job.throttled else "no" }}</span>
+                            </div>
+                        </div>
+                        <div class="actions" style="margin-top:16px;">
+                            <a class="button button-secondary" href="/crawler/{{ job.crawler_id }}">View Status</a>
+                        </div>
+                    </article>
+                    {% else %}
+                    <div class="empty-state">No crawler jobs yet. Start one to populate the live dashboard.</div>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+    </div>
 </body>
 </html>
