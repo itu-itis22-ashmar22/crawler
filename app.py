@@ -68,6 +68,23 @@ def create_crawler():
     return redirect(url_for("crawler_status_page", crawler_id=crawler_id, created="1"))
 
 
+@app.post("/crawler/<crawler_id>/resume")
+def resume_crawler(crawler_id: str):
+    try:
+        resumed_crawler_id = crawler_service.resume_crawler(crawler_id)
+    except ValueError as error:
+        return render_template(
+            "crawler.html",
+            jobs=crawler_service.list_crawlers(),
+            error_message=str(error),
+            form_data=_default_crawler_form(),
+            dashboard_metrics=_dashboard_metrics(),
+            active_page="crawler",
+        )
+
+    return redirect(url_for("crawler_status_page", crawler_id=resumed_crawler_id, resumed="1"))
+
+
 @app.get("/crawler/<crawler_id>")
 def crawler_status_page(crawler_id: str):
     status_payload = _crawler_status_payload(crawler_id)
@@ -77,6 +94,7 @@ def crawler_status_page(crawler_id: str):
         "crawler_status.html",
         crawler=status_payload,
         created=request.args.get("created") == "1",
+        resumed=request.args.get("resumed") == "1",
         active_page="status",
     )
 

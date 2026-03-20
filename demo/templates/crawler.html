@@ -170,6 +170,11 @@
                         </div>
                         <div class="actions" style="margin-top:16px;">
                             <a class="button button-secondary" href="/crawler/{{ job.crawler_id }}">View Status</a>
+                            {% if job.status == "interrupted" %}
+                            <form method="post" action="/crawler/{{ job.crawler_id }}/resume">
+                                <button class="button button-primary" type="submit">Resume Crawl</button>
+                            </form>
+                            {% endif %}
                         </div>
                     </article>
                     {% else %}

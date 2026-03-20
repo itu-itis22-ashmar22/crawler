@@ -52,6 +52,12 @@
         </div>
         {% endif %}
 
+        {% if resumed %}
+        <div class="alert alert-success">
+            Interrupted crawler resumed from its existing queue state.
+        </div>
+        {% endif %}
+
         <section class="data-grid">
             <article class="data-card">
                 <label>Status</label>
@@ -113,6 +119,13 @@
                         <span id="error_message">{{ crawler.error_message or "-" }}</span>
                     </div>
                 </div>
+                {% if crawler.status == "interrupted" %}
+                <div class="actions" style="margin-top:16px;">
+                    <form method="post" action="/crawler/{{ crawler.crawler_id }}/resume">
+                        <button class="button button-primary" type="submit">Resume Crawl</button>
+                    </form>
+                </div>
+                {% endif %}
             </section>
 
             <section class="panel">

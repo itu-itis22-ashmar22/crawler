@@ -101,21 +101,65 @@ class CrawlerService:
     def list_crawlers(self) -> list[dict]:
         return self.job_manager.list_jobs()
 
+    def resume_crawler(self, crawler_id: str) -> str:
+        job_data = self.job_manager.get_job(crawler_id)
+        if not job_data:
+            raise ValueError("Crawler not found.")
+        if job_data.get("status") != "interrupted":
+            raise ValueError("Only interrupted crawlers can be resumed.")
+
+        existing_thread = self.job_manager.threads_by_id.get(crawler_id)
+        if existing_thread and existing_thread.is_alive():
+            raise ValueError("Crawler is already running.")
+
+        queue_items = list(self._load_runtime_queue(crawler_id))
+        current_url = str(job_data.get("current_url") or "")
+        current_depth = job_data.get("current_depth")
+
+        if current_url:
+            current_item = (int(current_depth or 0), current_url)
+            if current_item not in queue_items:
+                queue_items.insert(0, current_item)
+            job_data["resume_current_url"] = current_url
+
+        if not queue_items:
+            raise ValueError("Interrupted crawler has no queued URLs left to resume.")
+
+        with self.job_manager.queue_lock:
+            rewrite_queue_file(crawler_id, queue_items)
+
+        job_data["queued_count"] = len(queue_items)
+        job_data["status"] = "queued"
+        job_data["error_message"] = ""
+        job_data["resume_requested"] = True
+
+        thread = threading.Thread(
+            target=self._run_crawler,
+            args=(crawler_id,),
+            daemon=True,
+            name=f"crawler-{crawler_id}",
+        )
+        self.job_manager.register_job(job_data, thread)
+        thread.start()
+        return crawler_id
+
     def _run_crawler(self, crawler_id: str) -> None:
         job_data = self.job_manager.get_job(crawler_id)
         if not job_data:
             return
 
         try:
+            resume_mode = bool(job_data.get("resume_requested"))
             job_data["status"] = "running"
             job_data["error_message"] = ""
+            job_data["resume_requested"] = False
             self._persist_job_state(crawler_id, job_data)
             append_log(
                 crawler_id,
-                f"START origin={job_data['origin_url']} max_depth={job_data['max_depth']}",
+                f"START origin={job_data['origin_url']} max_depth={job_data['max_depth']} resume={str(resume_mode).lower()}",
             )
 
-            runtime_queue = self._load_runtime_queue(crawler_id, job_data["origin_url"])
+            runtime_queue = self._load_runtime_queue(crawler_id)
             queued_urls = {url for _, url in runtime_queue}
 
             while runtime_queue and job_data["processed_count"] < job_data["max_urls_to_visit"]:
@@ -126,10 +170,14 @@ class CrawlerService:
 
                 depth, url = runtime_queue.popleft()
                 queued_urls.discard(url)
+                job_data["current_url"] = url
+                job_data["current_depth"] = depth
+                self._persist_job_state(crawler_id, job_data)
                 self._persist_queue(crawler_id, runtime_queue)
 
                 if depth > job_data["max_depth"]:
                     append_log(crawler_id, f"SKIP depth_limit depth={depth} url={url}")
+                    self._clear_current_item(job_data)
                     job_data["queued_count"] = len(runtime_queue)
                     job_data["throttled"] = len(runtime_queue) >= job_data["queue_capacity"]
                     self._persist_job_state(crawler_id, job_data)
@@ -138,13 +186,18 @@ class CrawlerService:
                 normalized_url = normalize_url(url)
                 if not normalized_url:
                     append_log(crawler_id, "SKIP invalid_normalized_url")
+                    self._clear_current_item(job_data)
                     job_data["queued_count"] = len(runtime_queue)
                     job_data["throttled"] = len(runtime_queue) >= job_data["queue_capacity"]
                     self._persist_job_state(crawler_id, job_data)
                     continue
 
-                if not self.job_manager.mark_visited(normalized_url):
+                should_retry_current = job_data.get("resume_current_url") == normalized_url
+                if should_retry_current:
+                    self._clear_resume_override(job_data)
+                elif not self.job_manager.mark_visited(normalized_url):
                     append_log(crawler_id, f"SKIP already_visited url={normalized_url}")
+                    self._clear_current_item(job_data)
                     job_data["queued_count"] = len(runtime_queue)
                     job_data["throttled"] = len(runtime_queue) >= job_data["queue_capacity"]
                     self._persist_job_state(crawler_id, job_data)
@@ -158,6 +211,7 @@ class CrawlerService:
 
                 if status_code == 0:
                     append_log(crawler_id, f"FETCH_FAIL url={normalized_url}")
+                    self._clear_current_item(job_data)
                     job_data["queued_count"] = len(runtime_queue)
                     job_data["throttled"] = len(runtime_queue) >= job_data["queue_capacity"]
                     self._persist_job_state(crawler_id, job_data)
@@ -168,6 +222,7 @@ class CrawlerService:
                         crawler_id,
                         f"FETCH_NON_200 status={status_code} url={normalized_url}",
                     )
+                    self._clear_current_item(job_data)
                     job_data["queued_count"] = len(runtime_queue)
                     job_data["throttled"] = len(runtime_queue) >= job_data["queue_capacity"]
                     self._persist_job_state(crawler_id, job_data)
@@ -178,6 +233,7 @@ class CrawlerService:
                         crawler_id,
                         f"FETCH_SKIP_NON_HTML type={content_type or 'unknown'} url={normalized_url}",
                     )
+                    self._clear_current_item(job_data)
                     job_data["queued_count"] = len(runtime_queue)
                     job_data["throttled"] = len(runtime_queue) >= job_data["queue_capacity"]
                     self._persist_job_state(crawler_id, job_data)
@@ -185,6 +241,7 @@ class CrawlerService:
 
                 if not html_text.strip():
                     append_log(crawler_id, f"FETCH_EMPTY url={normalized_url}")
+                    self._clear_current_item(job_data)
                     job_data["queued_count"] = len(runtime_queue)
                     job_data["throttled"] = len(runtime_queue) >= job_data["queue_capacity"]
                     self._persist_job_state(crawler_id, job_data)
@@ -219,6 +276,7 @@ class CrawlerService:
                     job_data["throttle_count"] += 1
                     job_data["last_throttle_at"] = _timestamp()
 
+                self._clear_current_item(job_data)
                 job_data["processed_count"] += 1
                 job_data["queued_count"] = len(runtime_queue)
                 job_data["throttled"] = throttled or len(runtime_queue) >= job_data["queue_capacity"]
@@ -244,7 +302,7 @@ class CrawlerService:
             self._persist_job_state(crawler_id, failed_job)
             append_log(crawler_id, f"FAILED error={error}")
 
-    def _load_runtime_queue(self, crawler_id: str, origin_url: str) -> deque[tuple[int, str]]:
+    def _load_runtime_queue(self, crawler_id: str) -> deque[tuple[int, str]]:
         queue_items: deque[tuple[int, str]] = deque()
         for line in read_lines(crawler_queue_path(crawler_id)):
             try:
@@ -253,9 +311,7 @@ class CrawlerService:
             except ValueError:
                 continue
 
-        if queue_items:
-            return queue_items
-        return deque([(0, origin_url)])
+        return queue_items
 
     def _persist_job_state(self, crawler_id: str, job_data: dict) -> None:
         job_data["updated_at"] = _timestamp()
@@ -264,6 +320,14 @@ class CrawlerService:
     def _persist_queue(self, crawler_id: str, runtime_queue: deque[tuple[int, str]]) -> None:
         with self.job_manager.queue_lock:
             rewrite_queue_file(crawler_id, list(runtime_queue))
+
+    def _clear_current_item(self, job_data: dict) -> None:
+        job_data["current_url"] = ""
+        job_data["current_depth"] = None
+        self._clear_resume_override(job_data)
+
+    def _clear_resume_override(self, job_data: dict) -> None:
+        job_data["resume_current_url"] = ""
 
     def _enqueue_links(
         self,

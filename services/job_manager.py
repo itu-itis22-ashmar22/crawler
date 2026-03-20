@@ -23,6 +23,10 @@ JOB_DEFAULTS = {
     "error_message": "",
     "throttle_count": 0,
     "last_throttle_at": "",
+    "current_url": "",
+    "current_depth": None,
+    "resume_current_url": "",
+    "resume_requested": False,
 }
 
 
