@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Search</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; line-height: 1.4; }
+        form { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+        input { flex: 1; padding: 0.5rem; }
+        button { padding: 0.5rem 1rem; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; vertical-align: top; }
+        nav { margin-bottom: 1rem; }
+        small { color: #555; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/crawler">Crawler</a> |
+        <a href="/search">Search</a>
+    </nav>
+
+    <h1>Search</h1>
+
+    <form method="get" action="/search">
+        <input type="search" name="query" value="{{ query }}" placeholder="Enter a query">
+        <button type="submit">Search</button>
+    </form>
+
+    {% if query %}
+    <p>Total matching result count: {{ total_count }}</p>
+    {% endif %}
+
+    {% if results %}
+    <table>
+        <thead>
+            <tr>
+                <th>Relevant URL</th>
+                <th>Origin URL</th>
+                <th>Depth</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for result in results %}
+            <tr>
+                <td>
+                    <a href="{{ result.relevant_url }}" target="_blank" rel="noreferrer">{{ result.relevant_url }}</a>
+                    <br>
+                    <small>frequency={{ result.total_frequency }}</small>
+                </td>
+                <td><a href="{{ result.origin_url }}" target="_blank" rel="noreferrer">{{ result.origin_url }}</a></td>
+                <td>{{ result.depth }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% elif query %}
+    <p>No results found for this query.</p>
+    {% endif %}
+</body>
+</html>

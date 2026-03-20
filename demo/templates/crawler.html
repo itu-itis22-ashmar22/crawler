@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Crawler</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; line-height: 1.4; }
+        form { display: grid; gap: 0.75rem; max-width: 32rem; margin-bottom: 2rem; }
+        label { display: grid; gap: 0.25rem; }
+        input { padding: 0.5rem; }
+        button { width: fit-content; padding: 0.5rem 1rem; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; vertical-align: top; }
+        .error { color: #a40000; margin-bottom: 1rem; }
+        nav { margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/crawler">Crawler</a> |
+        <a href="/search">Search</a>
+    </nav>
+
+    <h1>Crawler Jobs</h1>
+
+    {% if error_message %}
+    <p class="error">{{ error_message }}</p>
+    {% endif %}
+
+    <form method="post" action="/crawler">
+        <label>
+            Origin URL
+            <input type="url" name="origin_url" required value="{{ form_data.origin_url }}">
+        </label>
+        <label>
+            Max Depth
+            <input type="number" name="max_depth" min="0" max="5" required value="{{ form_data.max_depth }}">
+        </label>
+        <label>
+            Hit Rate (seconds)
+            <input type="number" name="hit_rate_seconds" min="0" max="10" step="0.1" required value="{{ form_data.hit_rate_seconds }}">
+        </label>
+        <label>
+            Max URLs
+            <input type="number" name="max_urls_to_visit" min="1" max="500" required value="{{ form_data.max_urls_to_visit }}">
+        </label>
+        <label>
+            Queue Capacity
+            <input type="number" name="queue_capacity" min="1" max="2000" required value="{{ form_data.queue_capacity }}">
+        </label>
+        <button type="submit">Start Crawler</button>
+    </form>
+
+    <h2>Previous Jobs</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Crawler ID</th>
+                <th>Origin URL</th>
+                <th>Status</th>
+                <th>Processed Count</th>
+                <th>Queued Count</th>
+                <th>Throttled</th>
+                <th>Status Page</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for job in jobs %}
+            <tr>
+                <td>{{ job.crawler_id }}</td>
+                <td><a href="{{ job.origin_url }}" target="_blank" rel="noreferrer">{{ job.origin_url }}</a></td>
+                <td>{{ job.status }}</td>
+                <td>{{ job.processed_count }}</td>
+                <td>{{ job.queued_count }}</td>
+                <td>{{ "yes" if job.throttled else "no" }}</td>
+                <td><a href="/crawler/{{ job.crawler_id }}">View</a></td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7">No crawler jobs yet.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

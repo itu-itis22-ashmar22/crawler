@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Crawler Status</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; line-height: 1.4; }
+        dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.5rem 1rem; margin-bottom: 2rem; }
+        pre { background: #f5f5f5; padding: 1rem; white-space: pre-wrap; }
+        nav { margin-bottom: 1rem; }
+        .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        @media (max-width: 800px) {
+            .columns { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/crawler">Crawler</a> |
+        <a href="/search">Search</a>
+    </nav>
+
+    <h1>Crawler Status</h1>
+
+    <dl>
+        <dt>Crawler ID</dt><dd id="crawler_id">{{ crawler.crawler_id }}</dd>
+        <dt>Origin URL</dt><dd id="origin_url"><a href="{{ crawler.origin_url }}" target="_blank" rel="noreferrer">{{ crawler.origin_url }}</a></dd>
+        <dt>Status</dt><dd id="status">{{ crawler.status }}</dd>
+        <dt>Max Depth</dt><dd id="max_depth">{{ crawler.max_depth }}</dd>
+        <dt>Processed Count</dt><dd id="processed_count">{{ crawler.processed_count }}</dd>
+        <dt>Discovered Count</dt><dd id="discovered_count">{{ crawler.discovered_count }}</dd>
+        <dt>Queued Count</dt><dd id="queued_count">{{ crawler.queued_count }}</dd>
+        <dt>Throttled</dt><dd id="throttled">{{ "true" if crawler.throttled else "false" }}</dd>
+        <dt>Updated At</dt><dd id="updated_at">{{ crawler.updated_at }}</dd>
+        <dt>Error Message</dt><dd id="error_message">{{ crawler.error_message or "-" }}</dd>
+    </dl>
+
+    <div class="columns">
+        <section>
+            <h2>Queue Preview</h2>
+            <pre id="queue_preview">{% for item in crawler.queue_preview %}{{ item }}
+{% else %}(empty)
+{% endfor %}</pre>
+        </section>
+        <section>
+            <h2>Log Tail</h2>
+            <pre id="log_tail">{% for item in crawler.log_tail %}{{ item }}
+{% else %}(no logs yet)
+{% endfor %}</pre>
+        </section>
+    </div>
+
+    <script>
+        const crawlerId = {{ crawler.crawler_id | tojson }};
+
+        function setText(id, value) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = value;
+            }
+        }
+
+        function setBlockText(id, lines, emptyText) {
+            const element = document.getElementById(id);
+            if (!element) {
+                return;
+            }
+            if (!Array.isArray(lines) || lines.length === 0) {
+                element.textContent = emptyText;
+                return;
+            }
+            element.textContent = lines.join("\n");
+        }
+
+        async function refreshStatus() {
+            const response = await fetch(`/api/crawler/${crawlerId}/status`, { cache: "no-store" });
+            if (!response.ok) {
+                return;
+            }
+
+            const data = await response.json();
+            setText("crawler_id", data.crawler_id ?? "");
+            setText("status", data.status ?? "");
+            setText("max_depth", data.max_depth ?? "");
+            setText("processed_count", data.processed_count ?? 0);
+            setText("discovered_count", data.discovered_count ?? 0);
+            setText("queued_count", data.queued_count ?? 0);
+            setText("throttled", String(Boolean(data.throttled)));
+            setText("updated_at", data.updated_at ?? "");
+            setText("error_message", data.error_message || "-");
+            setBlockText("queue_preview", data.queue_preview, "(empty)");
+            setBlockText("log_tail", data.log_tail, "(no logs yet)");
+        }
+
+        setInterval(refreshStatus, 3000);
+    </script>
+</body>
+</html>
